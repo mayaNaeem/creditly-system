@@ -21,6 +21,10 @@ interface LoginResponse {
 const TOKEN_KEY = 'creditly_token';
 const USER_KEY = 'creditly_user';
 
+export function defaultRouteForRole(role: AppRole | null): string {
+  return role === 'BANKER' ? '/auctions' : '/accounts';
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
@@ -44,19 +48,35 @@ export class AuthService {
   }
 
   login(email: string, password: string) {
-    return this.http
-      .post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, { email, password })
-      .pipe(
-        tap((res) => {
-          if (this.browserStorageAvailable) {
-            localStorage.setItem(TOKEN_KEY, res.token);
-            localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-          }
-          this.tokenSig.set(res.token);
-          this.userSig.set(res.user);
-          this.router.navigateByUrl('/accounts');
-        }),
-      );
+    const payload = { email, password };
+    return this.http.post<LoginResponse>(`${environment.apiBaseUrl}/auth/login`, payload).pipe(
+      tap((res) => {
+        if (this.browserStorageAvailable) {
+          localStorage.setItem(TOKEN_KEY, res.token);
+          localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+        }
+        this.tokenSig.set(res.token);
+        this.userSig.set(res.user);
+        this.router.navigateByUrl(defaultRouteForRole(res.user.role));
+      }),
+    );
+  }
+
+  // Development convenience: create/find a dev user and return a session
+  devLogin(username: string, password?: string) {
+    const body: any = { username };
+    if (password) body.password = password;
+    return this.http.post<LoginResponse>(`${environment.apiBaseUrl}/auth/dev-login`, body).pipe(
+      tap((res) => {
+        if (this.browserStorageAvailable) {
+          localStorage.setItem(TOKEN_KEY, res.token);
+          localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+        }
+        this.tokenSig.set(res.token);
+        this.userSig.set(res.user);
+        this.router.navigateByUrl(defaultRouteForRole(res.user.role));
+      }),
+    );
   }
 
   logout(): void {

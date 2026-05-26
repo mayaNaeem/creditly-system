@@ -11,9 +11,13 @@ type UserCtx = { id: string; role: Role; bankId: string | null };
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
-const selectWinner = <T extends { id: string; interestRate: number }>(offers: T[]) => {
+const selectWinner = <T extends { id: string; interestRate: number; createdAt: Date }>(offers: T[]) => {
   if (offers.length === 0) return null;
-  return offers.reduce((best, current) => (current.interestRate < best.interestRate ? current : best));
+  return offers.reduce((best, current) => {
+    if (current.interestRate < best.interestRate) return current;
+    if (current.interestRate === best.interestRate && current.createdAt < best.createdAt) return current;
+    return best;
+  });
 };
 
 export const auctionService = {
