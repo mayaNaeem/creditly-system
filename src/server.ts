@@ -5,12 +5,37 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import http from 'node:http';
 import { join } from 'node:path';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
+const BACKEND_HOST = process.env['BACKEND_HOST'] || 'localhost';
+const BACKEND_PORT = parseInt(process.env['BACKEND_PORT'] || '5001', 10);
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
+
+// Forward /api/proxy/* → backend Express server
+app.use('/api/proxy', (req, res) => {
+  const options: http.RequestOptions = {
+    hostname: BACKEND_HOST,
+    port: BACKEND_PORT,
+    path: req.url || '/',
+    method: req.method,
+    headers: { ...req.headers, host: `${BACKEND_HOST}:${BACKEND_PORT}` },
+  };
+
+  const proxy = http.request(options, (upstream) => {
+    res.writeHead(upstream.statusCode ?? 502, upstream.headers);
+    upstream.pipe(res);
+  });
+
+  proxy.on('error', () => {
+    if (!res.headersSent) res.status(502).json({ error: 'Backend unavailable' });
+  });
+
+  req.pipe(proxy);
+});
 
 /**
  * Example Express Rest API endpoints can be defined here.
